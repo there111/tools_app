@@ -445,7 +445,7 @@ class _ImageToolScreenState extends State<ImageToolScreen> {
               children: [
                 Expanded(
                   child: FilledButton.icon(
-                    onPressed: _entries.isEmpty ? null : _pickFiles,
+                    onPressed: _pickFiles,
                     icon: const Icon(Icons.add, size: 18),
                     label: Text(_entries.isEmpty ? '选择图片' : '添加更多 (${_entries.length})'),
                   ),
