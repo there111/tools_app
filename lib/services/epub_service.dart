@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 import 'package:archive/archive.dart';
 
@@ -25,8 +26,8 @@ class EpubService {
     final encoder = ZipEncoder();
     final archive = Archive();
 
-    // mimetype (第一个文件，不压缩)
-    archive.addFile(ArchiveFile('mimetype', 20, utf8.encode('application/epub+zip')));
+    // mimetype (第一个文件，必须不压缩)
+    archive.addFile(ArchiveFile.noCompress('mimetype', 20, utf8.encode('application/epub+zip')));
 
     // META-INF/container.xml
     const containerXml = '''<?xml version="1.0" encoding="UTF-8"?>
@@ -35,8 +36,7 @@ class EpubService {
     <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
   </rootfiles>
 </container>''';
-    archive.addFile(ArchiveFile('META-INF/container.xml', containerXml.length,
-        utf8.encode(containerXml)));
+    archive.addFile(ArchiveFile.string('META-INF/container.xml', containerXml));
 
     // 章节 HTML
     final manifestItems = <String>[];
@@ -49,19 +49,18 @@ class EpubService {
       spineItems.add('<itemref idref="$id"/>');
 
       final html = _buildChapterHtml(chapters[i], i + 1);
-      archive.addFile(
-          ArchiveFile('OEBPS/$href', html.length, utf8.encode(html)));
+      archive.addFile(ArchiveFile.string('OEBPS/$href', html));
     }
 
     // content.opf
     final manifestStr = manifestItems.join('\n    ');
     final spineStr = spineItems.join('\n    ');
     final opf = _buildOpf(title, author, manifestStr, spineStr);
-    archive.addFile(ArchiveFile('OEBPS/content.opf', opf.length, utf8.encode(opf)));
+    archive.addFile(ArchiveFile.string('OEBPS/content.opf', opf));
 
     // toc.ncx (可选，但很多阅读器需要)
     final ncx = _buildNcx(title, chapters);
-    archive.addFile(ArchiveFile('OEBPS/toc.ncx', ncx.length, utf8.encode(ncx)));
+    archive.addFile(ArchiveFile.string('OEBPS/toc.ncx', ncx));
 
     return Uint8List.fromList(encoder.encode(archive));
   }
@@ -137,6 +136,12 @@ class EpubService {
     return chapters;
   }
 
+  static String _generateUuid() {
+    final r = Random();
+    final hex = List.generate(32, (_) => r.nextInt(16).toRadixString(16)).join();
+    return '${hex.substring(0, 8)}-${hex.substring(8, 12)}-4${hex.substring(13, 16)}-${'89ab'[r.nextInt(4)]}${hex.substring(17, 20)}-${hex.substring(20, 32)}';
+  }
+
   static String _buildChapterHtml(_Chapter chapter, int index) {
     final escapedTitle = _escapeXml(chapter.title);
     final escapedBody = chapter.body
@@ -158,13 +163,14 @@ class EpubService {
       String title, String author, String manifest, String spine) {
     final escapedTitle = _escapeXml(title);
     final escapedAuthor = _escapeXml(author.isEmpty ? 'Unknown' : author);
+    final uuid = _generateUuid();
     return '''<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" unique-identifier="book-id" version="2.0">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
     <dc:title>$escapedTitle</dc:title>
     <dc:creator>$escapedAuthor</dc:creator>
     <dc:language>zh</dc:language>
-    <dc:identifier id="book-id">urn:uuid:${DateTime.now().millisecondsSinceEpoch}</dc:identifier>
+    <dc:identifier id="book-id">urn:uuid:$uuid</dc:identifier>
   </metadata>
   <manifest>
     <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
@@ -185,11 +191,12 @@ class EpubService {
       <content src="chapter${i + 1}.xhtml"/>
     </navPoint>''');
     }
+    final uuid = _generateUuid();
     final escapedTitle = _escapeXml(title);
     return '''<?xml version="1.0" encoding="UTF-8"?>
 <ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
   <head>
-    <meta name="dtb:uid" content="urn:uuid:${DateTime.now().millisecondsSinceEpoch}"/>
+    <meta name="dtb:uid" content="urn:uuid:$uuid"/>
   </head>
   <docTitle><text>$escapedTitle</text></docTitle>
   <navMap>

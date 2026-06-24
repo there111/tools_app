@@ -24,10 +24,8 @@ class _TxtEpubToolScreenState extends State<TxtEpubToolScreen> {
   final _authorCtrl = TextEditingController();
 
   Future<void> _pickInput() async {
-    final exts = _direction == 0 ? ['txt'] : ['epub'];
     final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: exts,
+      type: FileType.any,
       withData: true,
     );
     if (result == null || result.files.isEmpty || result.files.first.bytes == null) return;
